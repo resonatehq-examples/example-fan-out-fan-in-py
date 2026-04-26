@@ -1,0 +1,10 @@
+[project]
+name = "example-fan-out-fan-in-py"
+version = "0.1.0"
+description = "Fan-out parallel work across notification channels with durable fan-in."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.13"
+dependencies = [
+    "resonate-sdk>=0.6.3",
+]
