@@ -6,6 +6,12 @@
   </picture>
 </p>
 
+<p align="center">
+  <a href="https://resonatehq.github.io/examples-ci/">
+    <img src="https://img.shields.io/endpoint?url=https://resonatehq.github.io/examples-ci/status/example-fan-out-fan-in-py.json" alt="examples-ci status">
+  </a>
+</p>
+
 # Fan-Out / Fan-In
 
 **Resonate Python SDK**
