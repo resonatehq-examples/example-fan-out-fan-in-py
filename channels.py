@@ -12,9 +12,10 @@ import random
 import string
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from resonate import Context
+if TYPE_CHECKING:
+    from resonate.context import Context
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ _push_attempts: dict[str, int] = {}
 # ---------------------------------------------------------------------------
 
 
-def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     user_id = event["user_id"]
     print(f"  [email]   Sending order confirmation to user {user_id}...")
@@ -81,7 +82,7 @@ def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     user_id = event["user_id"]
     print(f"  [sms]     Sending SMS to user {user_id}...")
@@ -96,7 +97,7 @@ def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     print("  [slack]   Posting to #orders channel...")
     time.sleep(0.18)  # Slack webhooks are quick
@@ -110,7 +111,7 @@ def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_push(
+async def send_push(
     _: Context,
     event: dict[str, Any],
     simulate_crash: bool,
