@@ -5,34 +5,34 @@ Usage:
     uv run main.py            # happy path: all 4 channels in parallel
     uv run main.py --crash    # crash mode: push fails first attempt, retries
 
-Requires a running legacy Resonate server (``resonate serve``).
+Requires a running Resonate server (``resonate dev``).
 """
 
 from __future__ import annotations
 
+import asyncio
+import os
 import sys
 import time
 
-from resonate import Resonate
+from resonate.resonate import Resonate
 
 from channels import send_email, send_push, send_slack, send_sms
 from workflow import notify_all
 
 
-def main() -> None:
+async def main() -> None:
     simulate_crash = "--crash" in sys.argv
 
-    resonate = Resonate.remote()
+    url = os.environ.get("RESONATE_URL", "http://localhost:8001")
+    r = Resonate(url=url)
 
-    # Register the workflow and the four channel functions so the worker can
-    # claim and execute them via ctx.rfi(...).
-    workflow = resonate.register(notify_all)
-    resonate.register(send_email)
-    resonate.register(send_sms)
-    resonate.register(send_slack)
-    resonate.register(send_push)
-
-    resonate.start()
+    # Register the workflow and the four channel functions.
+    r.register(notify_all)
+    r.register(send_email)
+    r.register(send_sms)
+    r.register(send_slack)
+    r.register(send_push)
 
     order_id = f"ord_{int(time.time() * 1000)}"
     event = {
@@ -54,37 +54,42 @@ def main() -> None:
         f"notifying customer {event['user_id']}...\n"
     )
 
-    wall_start = time.time()
-    result = workflow.run(
-        f"notify/{event['order_id']}",
-        event,
-        simulate_crash,
-    )
-    wall_ms = int((time.time() - wall_start) * 1000)
-
-    print("\n=== Result ===")
-    print(f"Channels notified: {result['channels_notified']}/4")
-    print(f"Wall time: {wall_ms}ms")
-
-    print("\nChannel timings:")
-    for r in result["results"]:
-        channel = r["channel"].ljust(6)
-        print(f"  {channel} {r['duration_ms']}ms  {r['message_id']}")
-
-    sequential = sum(r["duration_ms"] for r in result["results"])
-
-    if not simulate_crash:
-        print(f"\nFan-out time:   {wall_ms}ms")
-        print(f"Sequential est: {sequential}ms")
-        print(f"Speedup:        {sequential / wall_ms:.1f}x")
-
-    if simulate_crash:
-        print(
-            "\nNotice: email/sms/slack each logged once. "
-            "Push failed → retried → succeeded."
+    try:
+        wall_start = time.time()
+        handle = r.run(
+            f"notify/{event['order_id']}",
+            notify_all,
+            event,
+            simulate_crash,
         )
-        print("Email, SMS, and Slack were NOT re-sent during the push retry.")
+        result = await handle.result()
+        wall_ms = int((time.time() - wall_start) * 1000)
+
+        print("\n=== Result ===")
+        print(f"Channels notified: {result['channels_notified']}/4")
+        print(f"Wall time: {wall_ms}ms")
+
+        print("\nChannel timings:")
+        for r_ in result["results"]:
+            channel = r_["channel"].ljust(6)
+            print(f"  {channel} {r_['duration_ms']}ms  {r_['message_id']}")
+
+        sequential = sum(r_["duration_ms"] for r_ in result["results"])
+
+        if not simulate_crash:
+            print(f"\nFan-out time:   {wall_ms}ms")
+            print(f"Sequential est: {sequential}ms")
+            print(f"Speedup:        {sequential / wall_ms:.1f}x")
+
+        if simulate_crash:
+            print(
+                "\nNotice: email/sms/slack each logged once. "
+                "Push failed → retried → succeeded."
+            )
+            print("Email, SMS, and Slack were NOT re-sent during the push retry.")
+    finally:
+        await r.stop()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

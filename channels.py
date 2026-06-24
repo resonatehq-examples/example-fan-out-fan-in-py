@@ -8,13 +8,15 @@ re-send.
 
 from __future__ import annotations
 
+import asyncio
 import random
 import string
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from resonate import Context
+if TYPE_CHECKING:
+    from resonate.context import Context
 
 
 # ---------------------------------------------------------------------------
@@ -66,11 +68,11 @@ _push_attempts: dict[str, int] = {}
 # ---------------------------------------------------------------------------
 
 
-def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     user_id = event["user_id"]
     print(f"  [email]   Sending order confirmation to user {user_id}...")
-    time.sleep(0.4)  # SMTP is slow
+    await asyncio.sleep(0.4)  # SMTP is slow
     message_id = _msg_id("email")
     print(f"  [email]   Sent — {message_id}")
     return {
@@ -81,11 +83,11 @@ def send_email(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     user_id = event["user_id"]
     print(f"  [sms]     Sending SMS to user {user_id}...")
-    time.sleep(0.25)  # Twilio is fast
+    await asyncio.sleep(0.25)  # Twilio is fast
     message_id = _msg_id("sms")
     print(f"  [sms]     Sent — {message_id}")
     return {
@@ -96,10 +98,10 @@ def send_sms(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
+async def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     start = time.time()
     print("  [slack]   Posting to #orders channel...")
-    time.sleep(0.18)  # Slack webhooks are quick
+    await asyncio.sleep(0.18)  # Slack webhooks are quick
     message_id = _msg_id("slack")
     print(f"  [slack]   Posted — {message_id}")
     return {
@@ -110,7 +112,7 @@ def send_slack(_: Context, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def send_push(
+async def send_push(
     _: Context,
     event: dict[str, Any],
     simulate_crash: bool,
@@ -126,7 +128,7 @@ def send_push(
         f"  [push]    Sending push notification to user {user_id} "
         f"(attempt {attempt})..."
     )
-    time.sleep(0.12)
+    await asyncio.sleep(0.12)
 
     if simulate_crash and attempt == 1:
         # Push service is temporarily down. Resonate retries this step.

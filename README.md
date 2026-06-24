@@ -27,33 +27,31 @@ Parallel notification delivery with crash recovery. When an order is confirmed, 
 
 ## How It Works
 
-`ctx.rfi(...)` starts each notification channel without blocking. All four start at the same time. The workflow fan-in collects results in order:
+`ctx.run(...)` dispatches each notification channel without blocking. All four start at the same time. Awaiting each handle is the fan-in:
 
 ```python
-def notify_all(ctx, event, simulate_crash):
-    # Fan-out: start all simultaneously
-    email_p = yield ctx.rfi(send_email, event).options(id=f"{ctx.id}.email")
-    sms_p   = yield ctx.rfi(send_sms,   event).options(id=f"{ctx.id}.sms")
-    slack_p = yield ctx.rfi(send_slack, event).options(id=f"{ctx.id}.slack")
-    push_p  = yield ctx.rfi(send_push,  event, simulate_crash).options(id=f"{ctx.id}.push")
+async def notify_all(ctx, event, simulate_crash):
+    # Fan-out: dispatch all simultaneously
+    f_email = ctx.run(send_email, event)
+    f_sms   = ctx.run(send_sms,   event)
+    f_slack = ctx.run(send_slack, event)
+    f_push  = ctx.run(send_push,  event, simulate_crash)
 
     # Fan-in: await each result
-    email = yield email_p
-    sms   = yield sms_p
-    slack = yield slack_p
-    push  = yield push_p
+    email = await f_email
+    sms   = await f_sms
+    slack = await f_slack
+    push  = await f_push
     ...
 ```
 
-Each `yield <handle>` is a checkpoint. If push fails and Resonate retries it, email/SMS/Slack results are already stored — they don't re-execute.
+Each `await <handle>` is a checkpoint. If push fails and Resonate retries it, email/SMS/Slack results are already stored — they don't re-execute.
 
 ## Prerequisites
 
 - [Python](https://www.python.org/) ≥ 3.13
 - [uv](https://docs.astral.sh/uv/) for dependency management
-- The [legacy Resonate server](https://github.com/resonatehq/resonate-legacy-server) installed locally (`brew install resonatehq/tap/resonate`)
-
-The Python SDK v0.6.x speaks the legacy server protocol, so the demo runs against `resonate serve`.
+- The [Resonate server](https://github.com/resonatehq/resonate) installed locally (`brew install resonatehq/tap/resonate`)
 
 ## Setup
 
@@ -65,10 +63,10 @@ uv sync
 
 ## Run It
 
-Start the legacy Resonate server in one terminal:
+Start the Resonate server in one terminal:
 
 ```shell
-resonate serve
+resonate dev
 ```
 
 **Happy path** — all 4 channels in parallel:
@@ -138,19 +136,19 @@ Function 'send_push' failed with 'Push service unavailable — will retry' (retr
 The workflow is small — see [`workflow.py`](workflow.py):
 
 ```python
-def notify_all(ctx, event, simulate_crash):
+async def notify_all(ctx, event, simulate_crash):
     start = time.time()
 
-    email_p = yield ctx.rfi(send_email, event).options(id=f"{ctx.id}.email")
-    sms_p   = yield ctx.rfi(send_sms,   event).options(id=f"{ctx.id}.sms")
-    slack_p = yield ctx.rfi(send_slack, event).options(id=f"{ctx.id}.slack")
-    push_p  = yield ctx.rfi(send_push,  event, simulate_crash).options(id=f"{ctx.id}.push")
+    f_email = ctx.run(send_email, event)
+    f_sms   = ctx.run(send_sms,   event)
+    f_slack = ctx.run(send_slack, event)
+    f_push  = ctx.run(send_push,  event, simulate_crash)
 
     results = [
-        (yield email_p),
-        (yield sms_p),
-        (yield slack_p),
-        (yield push_p),
+        await f_email,
+        await f_sms,
+        await f_slack,
+        await f_push,
     ]
 
     return {
@@ -173,7 +171,7 @@ example-fan-out-fan-in-py/
 
 ## One API for one or many
 
-`ctx.rfi(...)` is the same call whether you're running one branch or a hundred. There is no special "parallel" mode to flip, no DAG declaration, no child-workflow boilerplate. The fan-in is `yield <handle>` — awaiting the handle returned by `ctx.rfi(...)` — and partial failure is handled per-step via the promise store: a branch that succeeded checkpoints its result; a branch that failed retries independently.
+`ctx.run(...)` is the same call whether you're running one branch or a hundred. There is no special "parallel" mode to flip, no DAG declaration, no child-workflow boilerplate. The fan-in is `await <handle>` — awaiting the handle returned by `ctx.run(...)` — and partial failure is handled per-step via the promise store: a branch that succeeded checkpoints its result; a branch that failed retries independently.
 
 ## Learn More
 
